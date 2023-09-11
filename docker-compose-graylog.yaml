@@ -1,0 +1,62 @@
+version: "3.8"
+
+services:
+  mysql:
+    image: mysql
+    environment:
+      MYSQL_DATABASE: users
+      MYSQL_USER: admin
+      MYSQL_PASSWORD: admin
+      MYSQL_ROOT_PASSWORD: admin
+    ports:
+      - "3306:3306"
+    command: --default-authentication-plugin=mysql_native_password --slow-query-log=1 --long-query-time=1 --slow-query-log-file=/var/log/mysql/mysql-slow.log
+    volumes:
+      - mysql_volume:/var/lib/mysql
+      - ./logs:/var/log/mysql
+
+  mongo:
+    image: mongo:latest
+    container_name: mongo
+    volumes:
+      - ./data/mongo:/data/db
+    ports:
+      - "27017:27017"
+
+  elasticsearch:
+    image: elasticsearch:7.16.2
+    container_name: elasticsearch
+    environment:
+      discovery.type: single-node
+    ports:
+      - '9200:9200'
+    volumes:
+      - ./configs/elasticsearch.yml:/usr/share/elasticsearch/config/elasticsearch.yml:ro,z
+      - elasticsearch_volume:/usr/share/elasticsearch/data
+
+  graylog:
+    image: graylog/graylog:4.2
+    container_name: graylog
+    env_file: configs/graylog.env
+    entrypoint: /usr/bin/tini --  /docker-entrypoint.sh
+    ports:
+      - "9000:9000"
+      - "1514:1514"
+      - "1514:1514/udp"
+      - "12201:12201"
+      - "12201:12201/udp"
+      - "5044:5044"
+
+  filebeat:
+    image: elastic/filebeat:7.16.2
+    restart: always
+    user: root
+    command:
+      -e --strict.perms=false
+    volumes:
+      - ./configs/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
+      - ./logs:/var/log/mysql:ro
+
+volumes:
+  mysql_volume: {}
+  elasticsearch_volume: {}

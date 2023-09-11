@@ -1,0 +1,63 @@
+version: '3.8'
+services:
+
+  mysql:
+    image: mysql
+    environment:
+      MYSQL_DATABASE: users
+      MYSQL_USER: admin
+      MYSQL_PASSWORD: admin
+      MYSQL_ROOT_PASSWORD: admin
+    ports:
+      - "3306:3306"
+    command: --default-authentication-plugin=mysql_native_password --slow-query-log=1 --long-query-time=1 --slow-query-log-file=/var/log/mysql/mysql-slow.log
+    volumes:
+      - mysql_volume:/var/lib/mysql
+      - ./logs:/var/log/mysql
+
+  elasticsearch:
+    image: elasticsearch:8.9.2
+    container_name: elasticsearch
+    environment:
+      discovery.type: single-node
+    ports:
+      - '9200:9200'
+    volumes:
+      - ./configs/elasticsearch.yml:/usr/share/elasticsearch/config/elasticsearch.yml:ro,z
+      - elasticsearch_volume:/usr/share/elasticsearch/data
+
+  logstash:
+    image: logstash:8.9.2
+    volumes:
+      - ./configs/logstash.yml:/usr/share/logstash/config/logstash.yml:ro,z
+      - ./configs/logstash/pipeline:/usr/share/logstash/pipeline:ro,z
+    ports:
+      - "5044:5044"
+      - "5001:5000/tcp"
+      - "5001:5000/udp"
+      - "9600:9600"
+    depends_on:
+      - elasticsearch
+
+  kibana:
+    image: kibana:8.9.2
+    volumes:
+      - ./configs/kibana.yml:/usr/share/kibana/config/kibana.yml:ro,z
+    ports:
+      - "5601:5601"
+    depends_on:
+      - elasticsearch
+
+  filebeat:
+    image: elastic/filebeat:8.9.2
+    restart: always
+    user: root
+    command:
+      -e --strict.perms=false
+    volumes:
+      - ./configs/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
+      - ./logs:/var/log/mysql:ro
+
+volumes:
+  mysql_volume: { }
+  elasticsearch_volume: { }
